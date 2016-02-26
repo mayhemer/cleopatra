@@ -452,6 +452,7 @@
             return;
           }
           gHistogramContainer.displayWaterfall(data);
+          gHistogramContainer.assignBacktrackData(data);
 
           if (data.compositeTimes && data.compositeTimes.length > 2) {
             gTabWidget.addTab("Frames", function() {

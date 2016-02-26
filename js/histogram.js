@@ -109,7 +109,7 @@ var HistogramContainer;
       container.appendChild(br3);
       container.appendChild(text2);
       this.waterfallRow.appendChild(container);
-
+      
       var cell = createElement("div", {
         style: {flex: 1},
         className: "threadHistogramContent"
@@ -119,6 +119,36 @@ var HistogramContainer;
       this.waterfallRow.appendChild(cell);
 
       cell.appendChild(this.waterfall.getContainer());
+
+      // Backtrack (hard coded prototype)
+      this.backtrackRow = createElement("div", {
+        className: "waterfallOrThreadRow"
+      });
+      this.container.appendChild(this.backtrackRow);
+
+      container = createElement("div", {
+        className: "threadHistogramDescription",
+      });
+      text1 = createElement("text", {
+        textContent: "Backtrack",
+      });
+      var reachPickButton = createElement("input", {
+          type:"button",
+          value:"Pick"
+      });
+      container.appendChild(text1);
+      container.appendChild(createElement("br", {}));
+      container.appendChild(reachPickButton);
+      this.backtrackRow.appendChild(container);
+      
+      var cell = createElement("div", {
+        style: {flex: 1},
+        className: "threadHistogramContent"
+      });
+      this.backtrackRow.appendChild(cell);
+      this.backtrack = new Backtrack();
+      this.backtrack.setPickButton(reachPickButton);
+      cell.appendChild(this.backtrack.getContainer());
 
       var compositorThreadMinimize = null;
       Object.keys(threads).forEach(function (id) {
@@ -226,6 +256,16 @@ var HistogramContainer;
       }
       if (!data && this.waterfallRow) {
         this.waterfallRow.style.display = "none";
+      }
+    },
+    
+    assignBacktrackData: function(data) {
+      if (this.backtrack && data) {
+        this.backtrackRow.style.display = "";
+        this.backtrack.assignData(data);
+      }
+      if (!data && this.backtrackRow) {
+        this.backtrackRow.style.display = "none";
       }
     },
 

@@ -751,3 +751,77 @@ iframe {
 .chooserPanel > ul > li > a:hover {
   background-color: rgba(0,0,0,0.1);
 }
+
+.backtrackPickerContainer {
+  position: relative;
+  margin-left: auto;
+  margin-right: auto;
+  width: 80%;
+  z-index: 2000;
+  top: 80px;
+  background: white none repeat scroll 0% 0%;
+  padding: 1.5em;
+  box-shadow: 4px 4px 8px -1px;
+}
+
+.backtrackPickerContainer > select {
+  width: 100%;
+}
+
+.backtrackPickerContainer > input[type=button] {
+  border: none;
+  background: none;
+  padding: 0;
+  margin: 1em 0;
+}
+
+.backtrackTape:hover {
+  outline: 4px solid yellow;
+}
+
+.backtrackTape {
+  position: absolute;
+  height: 12px;
+}
+
+.backtrackType-CPU_on_path {
+  top: 0;
+  height: 100%;
+  background-color: Black;
+}
+
+.backtrackType-CPU_blocking {
+  top: 0;
+  height: 100%;
+  background-color: DarkGray;
+}
+
+.backtrackType-dispatch_runnable {
+  top: 0;
+  background-color: DeepPink;
+}
+
+.backtrackType-dispatch_timer {
+  top: 0;
+  background-color: DarkBlue;
+}
+
+.backtrackType-dispatch_ipc {
+  top: 12px;
+  background-color: Coral;
+}
+
+.backtrackType-dispatch_ipc_overhead {
+  top: 12px;
+  background-color: Chocolate;
+}
+
+.backtrackType-dispatch_gen {
+  top: 24px;
+  background-color: Peru;
+}
+
+.backtrackType-network {
+  top: 32px;
+  background-color: CornflowerBlue;
+}

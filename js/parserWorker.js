@@ -2345,6 +2345,7 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
     framePositions: {},
     vsyncTimes: [],
     threadsToView: [],
+    backtrack: {},
     selectedThreadId: selectedThreadId,
   };
 
@@ -2411,6 +2412,27 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
       if (markersIn[i].data &&
           markersIn[i].data.category == "Paint") {
         markersOut.push(markersIn[i]);
+      }
+    }
+    return markersOut;
+  }
+
+  function getBacktrackMarkers() {
+    var markersOut = {};
+    for (var threadId in profile.threads) {
+      var thread = profile.threads[threadId];
+      var markersIn = thread.markers;
+
+      markersOut[threadId] = [];
+      for (var i = 0; i < markersIn.length; i++) {
+        var markerIn = markersIn[i];
+        if (markerIn.data &&
+            markerIn.data.category == "Backtrack") {
+
+          var markerOut = JSON.parse(markerIn.name);
+          markerOut.time = markerIn.time;
+          markersOut[threadId].push(markerOut);
+        }
       }
     }
     return markersOut;
@@ -2724,6 +2746,11 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
       }
     }
   }
+  
+  function addBacktrackMarkers() {
+    var markers = getBacktrackMarkers();
+    result.backtrack = markers;
+  }
 
   var mainThreadState = "Waiting";
   var compThreadState = "Waiting";
@@ -2734,6 +2761,7 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
   addMainThreadMarkers();
   addCompositorThreadMarkers();
   addGPUMarkers();
+  addBacktrackMarkers();
 
   sendFinished(requestID, result);
 }
