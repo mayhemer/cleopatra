@@ -10,7 +10,7 @@ var gNextProfileID = 0;
 
 var gLogLines = [];
 
-var gDebugLog = false;
+var gDebugLog = true;
 var gDebugTrace = false;
 // Use for verbose tracing, otherwise use log
 function PROFILDERTRACE(msg) {
@@ -20,8 +20,7 @@ function PROFILDERTRACE(msg) {
 function PROFILERLOG(msg) {
   if (gDebugLog) {
     msg = "Cleo: " + msg;
-    //if (window.dump)
-    //  window.dump(msg + "\n");
+    console.log(msg + "\n");
   }
 }
 function PROFILERERROR(msg) {
@@ -92,14 +91,14 @@ self.onmessage = function (msg) {
       taskData = partialTaskData[requestID];
       delete partialTaskData[requestID];
     }
-    PROFILERLOG("Start task: " + task);
+    PROFILERLOG("Start task: " + task + " / " + requestID);
 
     gLogLines = [];
 
     switch (task) {
       case "initWorker":
-        gDebugLog = taskData.debugLog;
-        gDebugTrace = taskData.debugTrace;
+        //gDebugLog = taskData.debugLog;
+        //gDebugTrace = taskData.debugTrace;
         PROFILERLOG("Init logging in parserWorker");
         return;
       case "chunkedStart":
@@ -133,6 +132,9 @@ self.onmessage = function (msg) {
         break;
       case "calculateWaterfallData":
         calculateWaterfallData(requestID, taskData.profileID, taskData.boundaries, taskData.selectedThreadId);
+        break;
+      case "calculateBacktrackData":
+        calculateBacktrackData(requestID, taskData.profileID, taskData.boundaries);
         break;
       case "getLogData":
         getLogData(requestID, taskData.profileID, taskData.boundaries);
@@ -291,6 +293,7 @@ function parseRawProfile(requestID, params, rawProfile) {
   var threads = {};
   var meta = {};
   var tasktracer = null;
+  var backtrack = null;
   var armIncludePCIndex = {};
 
   if (rawProfile == null) {
@@ -329,8 +332,6 @@ function parseRawProfile(requestID, params, rawProfile) {
   } else {
     parseProfileString(rawProfile);
   }
-
-  tasktracer = rawProfile.tasktracer;
 
   if (params.profileId) {
     meta.profileId = params.profileId;
@@ -821,6 +822,9 @@ function parseRawProfile(requestID, params, rawProfile) {
         threads["timeline"+i] = fakeThread;
       }
     }
+    
+    tasktracer = profile.tasktracer;
+    backtrack = profile.backtrack;
 
     //TODO: test with REALLY old profiles
     // in the old formats the markers are in the same array as the samples
@@ -853,6 +857,9 @@ function parseRawProfile(requestID, params, rawProfile) {
     }
     function parseJSONSamples(profileSamples) {
       var samples = [];
+      if (!profileSamples) {
+        return samples;
+      }
       for (var j = 0; j < profileSamples.length; j++) {
         var sample = profileSamples[j];
         var indicedFrames = [];
@@ -945,6 +952,7 @@ function parseRawProfile(requestID, params, rawProfile) {
   gProfiles[profileID] = JSON.parse(JSON.stringify({
     meta: meta,
     tasktracer: tasktracer,
+    backtrack: backtrack,
     symbols: symbols,
     functions: functions,
     resources: resources,
@@ -954,6 +962,7 @@ function parseRawProfile(requestID, params, rawProfile) {
   sendFinished(requestID, {
     meta: meta,
     tasktracer: tasktracer,
+    backtrack: backtrack,
     numSamples: threads[0].samples.length,
     profileID: profileID,
     symbols: symbols,
@@ -983,6 +992,7 @@ function getSerializedProfile(requestID, profileID, complete) {
     format: "profileJSONWithSymbolicationTable,1",
     meta: profile.meta,
     tasktracer: profile.tasktracer,
+    backtrack: profile.backtrack,
     profileJSON: complete ? { threads: profile.threads } : profile.filteredThreadSamples[DEFAULT_SAVE_THREAD],
     symbolicationTable: symbolicationTable
   });
@@ -2332,6 +2342,19 @@ function getLogData(requestID, profileID, boundaries) {
   sendFinished(requestID, result);
 }
 
+function calculateBacktrackData(requestID, profileID, boundaries) {
+  var profile = gProfiles[profileID];
+  var backtrack = profile.backtrack;
+  
+  var result = {
+    boundaries: boundaries,
+    threads: backtrack.threads,
+    reference: backtrack.sampler_reference
+  };
+  
+  sendFinished(requestID, result);  
+}
+
 // Within each marker type the returned markers should be sorted in ascending order
 // by time and be non-overlapping
 function calculateWaterfallData(requestID, profileID, boundaries, selectedThreadId) {
@@ -2345,7 +2368,6 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
     framePositions: {},
     vsyncTimes: [],
     threadsToView: [],
-    backtrack: {},
     selectedThreadId: selectedThreadId,
   };
 
@@ -2412,27 +2434,6 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
       if (markersIn[i].data &&
           markersIn[i].data.category == "Paint") {
         markersOut.push(markersIn[i]);
-      }
-    }
-    return markersOut;
-  }
-
-  function getBacktrackMarkers() {
-    var markersOut = {};
-    for (var threadId in profile.threads) {
-      var thread = profile.threads[threadId];
-      var markersIn = thread.markers;
-
-      markersOut[threadId] = [];
-      for (var i = 0; i < markersIn.length; i++) {
-        var markerIn = markersIn[i];
-        if (markerIn.data &&
-            markerIn.data.category == "Backtrack") {
-
-          var markerOut = JSON.parse(markerIn.name);
-          markerOut.time = markerIn.time;
-          markersOut[threadId].push(markerOut);
-        }
       }
     }
     return markersOut;
@@ -2747,11 +2748,6 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
     }
   }
   
-  function addBacktrackMarkers() {
-    var markers = getBacktrackMarkers();
-    result.backtrack = markers;
-  }
-
   var mainThreadState = "Waiting";
   var compThreadState = "Waiting";
   var compThreadPos = 0;
@@ -2761,7 +2757,6 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
   addMainThreadMarkers();
   addCompositorThreadMarkers();
   addGPUMarkers();
-  addBacktrackMarkers();
 
   sendFinished(requestID, result);
 }

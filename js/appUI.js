@@ -446,13 +446,21 @@
           gVideoPane.setBoundaries(boundaries);
         }
 
+        var backtrackRequest = Parser.calculateBacktrackData(boundaries);
+        backtrackRequest.addEventListener("finished", function (data) {
+          console.log("backtrack::finished " + !!data);
+          if (!data) {
+            return;
+          }
+
+          gHistogramContainer.assignBacktrackData(data);
+        });
         var waterfallRequest = Parser.calculateWaterfallData(boundaries, gHistogramContainer.getWaterfallThreadId());
         waterfallRequest.addEventListener("finished", function (data) {
           if (!data) {
             return;
           }
           gHistogramContainer.displayWaterfall(data);
-          gHistogramContainer.assignBacktrackData(data);
 
           if (data.compositeTimes && data.compositeTimes.length > 2) {
             gTabWidget.addTab("Frames", function() {

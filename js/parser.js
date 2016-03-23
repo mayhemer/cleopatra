@@ -276,6 +276,15 @@ var Parser = {
     return request;
   },
 
+  calculateBacktrackData: function Parser_caculateWaterfallData(boundaries) {
+    var request = new WorkerRequest(gParserWorker);
+    request.send("calculateBacktrackData", {
+      profileID: 0,
+      boundaries: boundaries,
+    });
+    return request;
+  },
+
   calculateWaterfallData: function Parser_caculateWaterfallData(boundaries, selectedThreadId) {
     var request = new WorkerRequest(gParserWorker);
     request.send("calculateWaterfallData", {

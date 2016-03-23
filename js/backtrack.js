@@ -24,24 +24,24 @@ function Backtrack(data)
   });
   this.data = null;
   this.pickButton = null;
-  
-  this.reachPoint = 0;
-  this.reachThread = 0;
+
+  this.objectiveMarker;
+  this.objectiveThread;
 }
 
 Backtrack.prototype = {
   getContainer: function Waterfall_getContainer() {
     return this.container;
   },
-  
+
   setPickButton: function Waterfall_setPickButton(pick) {
     this.pickButton = pick;
-    
-    var pickReachType;
-    var pickReachMarker;
 
-    pickReachType = function() {
-      var reachTypes = this._getReachTypes();
+    var pickObjectivesType;
+    var pickObjectivesMarker;
+
+    pickObjectivesType = function() {
+      var objectiveTypes = this._getObjectivesTypes();
       var selectorContent = createElement("div", {
         className: "backtrackPickerContainer"
       });
@@ -51,9 +51,9 @@ Backtrack.prototype = {
       var typeSelector = createElement("select", {
         size: 30,
       });
-      for (var reach of reachTypes) {
+      for (var Objectives of objectiveTypes) {
         var opt = createElement("option", {});
-        opt.appendChild(document.createTextNode(reach));
+        opt.appendChild(document.createTextNode(Objectives));
         typeSelector.appendChild(opt);
       }
       backButton.onclick = () => {
@@ -61,15 +61,15 @@ Backtrack.prototype = {
       }
       typeSelector.onchange = () => {
         selectorContent.parentNode.removeChild(selectorContent);
-        pickReachMarker.bind(this)(typeSelector.value);
+        pickObjectivesMarker.bind(this)(typeSelector.value);
       }
       selectorContent.appendChild(backButton);
       selectorContent.appendChild(typeSelector);
       document.body.appendChild(selectorContent);
     };
-    
-    pickReachMarker = function(type) {
-      var reachMarkers = this._getReachMarkers(type);
+
+    pickObjectivesMarker = function(type) {
+      var objectiveMarkers = this._getObjectivesMarkers(type);
       var selectorContent = createElement("div", {
         className: "backtrackPickerContainer"
       });
@@ -79,52 +79,52 @@ Backtrack.prototype = {
       var typeSelector = createElement("select", {
         size: 30,
       });
-      for (var reach_id = 0; reach_id < reachMarkers.length; ++reach_id) {
-        var reach = reachMarkers[reach_id].marker;
+      for (var objective_id = 0; objective_id < objectiveMarkers.length; ++objective_id) {
+        var Objectives = objectiveMarkers[objective_id].marker;
         var opt = createElement("option", {
-          value: reach_id
+          value: objective_id
         });
-        opt.appendChild(document.createTextNode(reach.i));
+        opt.appendChild(document.createTextNode(Objectives.d));
         typeSelector.appendChild(opt);
       }
       backButton.onclick = () => {
         selectorContent.parentNode.removeChild(selectorContent);
-        pickReachType.bind(this)();
+        pickObjectivesType.bind(this)();
       }
       typeSelector.onchange = () => {
         selectorContent.parentNode.removeChild(selectorContent);
-        this.reachPoint = reachMarkers[typeSelector.value].marker_id;
-        this.reachThread = reachMarkers[typeSelector.value].thread_id;
+        this.objectiveMarker = objectiveMarkers[typeSelector.value].marker;
+        this.objectiveThread = objectiveMarkers[typeSelector.value].thread;
         this.display();
       }
       selectorContent.appendChild(backButton);
       selectorContent.appendChild(typeSelector);
       document.body.appendChild(selectorContent);
     }
-    
-    this.pickButton.onclick = pickReachType.bind(this);
+
+    this.pickButton.onclick = pickObjectivesType.bind(this);
   },
-  
+
   _isMarkerInBoundary: function(marker) {
     return (marker.time >= this.data.boundaries.min) &&
            (marker.time <= this.data.boundaries.max);
   },
-  
-  _getReachTypes: function() {
+
+  _getObjectivesTypes: function() {
     var result = [];
 
-    if (!this.backtrack) {
+    if (!this.data.threads) {
       return result;
     }
-    
+
     var set = {};
-    for (var thread_id in this.backtrack) {
-      var thread = this.backtrack[thread_id];
-      for (var marker of thread) {
+    for (var thread_id in this.data.threads) {
+      var thread = this.data.threads[thread_id];
+      for (var marker of thread.markers) {
         if (!this._isMarkerInBoundary(marker)) {
           continue;
         }
-        if (marker.t === "r") {
+        if (marker.t === "o") {
           set[marker.w] = true;
         }
       }
@@ -136,126 +136,112 @@ Backtrack.prototype = {
     return result;
   },
 
-  _getReachMarkers: function(type) {
+  _getObjectivesMarkers: function(type) {
     var result = [];
 
-    if (!this.backtrack) {
+    if (!this.data) {
       return result;
     }
-    
-    for (var thread_id in this.backtrack) {
-      var thread = this.backtrack[thread_id];
-      for (var marker_id in thread) {
-        var marker = thread[marker_id];
+
+    for (var thread_id in this.data.threads) {
+      var thread = this.data.threads[thread_id];
+      for (var marker_id in thread.markers) {
+        var marker = thread.markers[marker_id];
         if (!this._isMarkerInBoundary(marker)) {
           continue;
         }
-        if (marker.t === "r" && marker.w === type) {
+        if (marker.t === "o" && marker.w === type) {
           result.push({
-            time: marker.time, 
-            marker: marker,
-            marker_id: marker_id, 
-            thread_id: thread_id
+            thread: thread,
+            marker: marker
           });
         }
       }
     }
     result.sort(function(a, b) {
-      if (a.time == b.time) return 0;
-      return (a.time > b.time) ? 1 : -1;
+      if (a.marker.time == b.marker.time) return 0;
+      return (a.marker.time > b.marker.time) ? 1 : -1;
     });
     return result;
   },
 
   assignData: function Backtrack_assignData(data) {
     this.data = data;
-    this.backtrack = data.backtrack;
-    
-    if (this.reachPoint) {
+
+    // todo - this.objectiveMarkerId needs reset on new data
+    if (this.objectiveMarker) {
       this.display();
     }
   },
-  
+
   display: function Backtrack_display() {
     this.container.innerHTML = "";
-    
-    var range = this.data.boundaries.max - this.data.boundaries.min;
-    
-    var thread_id = this.reachThread;
-    var thread = this.backtrack[thread_id];
-    var marker_id = this.reachPoint;
-    var marker = thread[marker_id];
 
-    var status = "CPU_on_path";
-    var status_end = marker.time;
+    var range = this.data.boundaries.max - this.data.boundaries.min;
+
+    var caret = {};
+    caret.thread = this.objectiveThread;
+    caret.marker = this.objectiveMarker;
+    caret.closing = caret.marker;
+    caret.closing_thread = caret.thread;
     
-    var updateStatus = function(begin, nextStatus)
+    var draw = function(caret, name)
     {
-      var startX = (begin - this.data.boundaries.min) * 100.0 / range;
-      var stopX = (status_end - this.data.boundaries.min) * 100.0 / range;
-      
+      var startX = (caret.marker.time - this.data.boundaries.min) * 100.0 / range;
+      var stopX = (caret.closing.time - this.data.boundaries.min) * 100.0 / range;
+
       var block = createElement("div", {
-        className: "backtrackTape backtrackType-" + status,
+        className: "backtrackTape backtrackType-" + name,
         style: {
           left: startX + "%",
           width: (stopX - startX < 0.5) ? "1px" : (stopX - startX) + "%",
         }
       });
 
-      var end = status_end;
+      var len = caret.closing.time - caret.marker.time;
       block.onclick = () => {
-        alert(begin + ":" + end + " = " + (marker.w || "(no data)"));
+        alert(caret.marker.time + "ms@" + caret.thread.name + "\n+" + 
+              len + "ms@" + caret.closing_thread.name + "\n" + 
+              (caret.marker.w || "(no data)"));
       }
       this.container.appendChild(block);
       
-      status = nextStatus;
-      status_end = begin;
+      caret.closing = caret.marker;
+      caret.closing_thread = caret.thread;
     }.bind(this);
-    
-    var find = function(gid, type)
+
+    var find = function(gid, caret)
     {
-      // TODO optimize!!!
-      for (var _thread_id in this.backtrack) {
-        var _thread = this.backtrack[_thread_id];
-        for (var _marker_id in _thread) {
-          var _marker = _thread[_marker_id];
-          if (_marker.i == gid && _marker.t == type) {
-            thread_id = _thread_id;
-            thread = _thread;
-            marker_id = _marker_id;
-            marker = _marker;            
-            return true;
-          }
-        }
+      if (gid[1] == 0) {
+        return false;
       }
       
-      return false;
+      caret.thread = this.data.threads[gid[0]];
+      if (!caret.thread) {
+        return false;
+      }
+      
+      caret.marker = caret.thread.markers[gid[1] - 1];
+      return (caret.marker.i == gid[1]);
     }.bind(this);
-    
-    while (marker.time > this.data.boundaries.min) {
-      switch (marker.t) {
+
+    while (caret.marker.time > this.data.boundaries.min) {
+
+      switch (caret.marker.t) {
         case "d": // dequeue
-          updateStatus(marker.time, "");
-          if (!find(marker.i, "q")) {
-            alert("Queue/dispatch marker not found");
+          draw(caret, "CPU_on_path");
+          if (!find(caret.marker.o, caret) ) {
+            console.log("Queue/dispatch marker not found");
             return;
           }
-          continue;
-        case "q": // queue
-          switch (marker.w) {
-            case "run": status = "dispatch_runnable"; break;
-            case "ipc": status = "dispatch_ipc"; break;
-            case "ipco": status = "dispatch_ipc_overhead"; break;
-            case "timer": status = "dispatch_timer"; break;
-            case "net": status = "network"; break;
-            case "gen": status = "dispatch_gen"; break;
-          }
-          updateStatus(marker.time, "CPU_on_path");
+          draw(caret, "dispatch_" + caret.marker.w);
           break;
-      } // switch
-      
-      --marker_id;
-      marker = thread[marker_id];
+      }
+
+      if (!find([caret.thread.tid, caret.marker.i - 1], caret)) {
+        console.log("Hit start of the thread");
+        break;
+      }
     } // while (in range)
   }
 };

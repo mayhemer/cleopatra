@@ -796,24 +796,29 @@ iframe {
   background-color: DarkGray;
 }
 
-.backtrackType-dispatch_runnable {
+.backtrackType-dispatch_run {
   top: 0;
   background-color: DeepPink;
 }
 
-.backtrackType-dispatch_timer {
+.backtrackType-dispatch_ipc {
   top: 0;
   background-color: DarkBlue;
 }
 
-.backtrackType-dispatch_ipc {
+.backtrackType-dispatch_ipco {
   top: 12px;
   background-color: Coral;
 }
 
-.backtrackType-dispatch_ipc_overhead {
+.backtrackType-dispatch_timer {
   top: 12px;
   background-color: Chocolate;
+}
+
+.backtrackType-dispatch_net {
+  top: 24px;
+  background-color: Peru;
 }
 
 .backtrackType-dispatch_gen {

@@ -104,6 +104,7 @@
             }
             break;
           case "importFromAddonFinish":
+            // alert("DEBUG 1");
             this.importFromAddonFinish(o.rawProfile);
             break;
         }
@@ -539,6 +540,7 @@
         reporter.finish();
         gMeta = result.meta;
         gTaskTracer = result.tasktracer;
+        gBacktrack = result.backtrack;
         gNumSamples = result.numSamples;
         gSymbols = result.symbols;
         gFunctions = result.functions;
