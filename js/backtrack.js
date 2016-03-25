@@ -30,11 +30,15 @@ function Backtrack(data)
 }
 
 Backtrack.prototype = {
-  getContainer: function Waterfall_getContainer() {
+  round: function(ms) {
+    return Math.round(ms * 10) / 10.0;
+  },
+  
+  getContainer: function Backtrack_getContainer() {
     return this.container;
   },
 
-  setPickButton: function Waterfall_setPickButton(pick) {
+  setPickButton: function Backtrack_setPickButton(pick) {
     this.pickButton = pick;
 
     var pickObjectivesType;
@@ -178,6 +182,7 @@ Backtrack.prototype = {
     this.container.innerHTML = "";
 
     var range = this.data.boundaries.max - this.data.boundaries.min;
+    var one_pixel = 100 / this.container.clientWidth;
 
     var caret = {};
     caret.thread = this.objectiveThread;
@@ -185,7 +190,7 @@ Backtrack.prototype = {
     caret.closing = caret.marker;
     caret.closing_thread = caret.thread;
     
-    var draw = function(caret, name)
+    var backdraw = function(caret, name)
     {
       var startX = (caret.marker.time - this.data.boundaries.min) * 100.0 / range;
       var stopX = (caret.closing.time - this.data.boundaries.min) * 100.0 / range;
@@ -194,16 +199,20 @@ Backtrack.prototype = {
         className: "backtrackTape backtrackType-" + name,
         style: {
           left: startX + "%",
-          width: (stopX - startX < 0.5) ? "1px" : (stopX - startX) + "%",
+          width: ((stopX - startX) < one_pixel) ? "1px" : ((stopX - startX) + "%")
         }
       });
 
-      var len = caret.closing.time - caret.marker.time;
-      block.onclick = () => {
-        alert(caret.marker.time + "ms@" + caret.thread.name + "\n+" + 
-              len + "ms@" + caret.closing_thread.name + "\n" + 
-              (caret.marker.w || "(no data)"));
-      }
+      var begin_time = this.round(caret.marker.time);
+      var begin_thread = caret.thread.name;
+      var duration = this.round(caret.closing.time - caret.marker.time);
+      var end_thread = caret.closing_thread.name;
+      var what = caret.marker.w;
+      var details = caret.marker.d;
+      block.setAttribute("title", 
+        begin_time + "ms@" + begin_thread + "\n+" + 
+        duration + "ms@" + end_thread + "\n" + 
+        (what || "") + (details ? " / " + details : "")) ;
       this.container.appendChild(block);
       
       caret.closing = caret.marker;
@@ -213,11 +222,13 @@ Backtrack.prototype = {
     var find = function(gid, caret)
     {
       if (gid[1] == 0) {
+        console.log("gid.id == 0");
         return false;
       }
       
       caret.thread = this.data.threads[gid[0]];
       if (!caret.thread) {
+        console.log("thread for gid.tid=" + gid[0] + " not found");
         return false;
       }
       
@@ -229,12 +240,12 @@ Backtrack.prototype = {
 
       switch (caret.marker.t) {
         case "d": // dequeue
-          draw(caret, "CPU_on_path");
+          backdraw(caret, "CPU_on_path");
           if (!find(caret.marker.o, caret) ) {
-            console.log("Queue/dispatch marker not found");
+            console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
             return;
           }
-          draw(caret, "dispatch_" + caret.marker.w);
+          backdraw(caret, "dispatch_" + caret.marker.w);
           break;
       }
 

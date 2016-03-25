@@ -775,13 +775,25 @@ iframe {
   margin: 1em 0;
 }
 
-.backtrackTape:hover {
-  outline: 4px solid yellow;
-}
 
 .backtrackTape {
   position: absolute;
   height: 12px;
+  cursor: default;
+}
+.backtrackTape:hover {
+  opacity: 0.6;
+}
+.backtrackTape[tooltip]:before {            
+  position : absolute;
+  margin-left: 1em;
+  content : attr(tooltip);
+  display: none;
+  width: 50em;
+  z-index: 99999;
+}
+.backtrackTape[tooltip]:hover:before {            
+  display: block;
 }
 
 .backtrackType-CPU_on_path {
@@ -807,22 +819,22 @@ iframe {
 }
 
 .backtrackType-dispatch_ipco {
-  top: 12px;
+  top: 0px;
   background-color: Coral;
 }
 
 .backtrackType-dispatch_timer {
-  top: 12px;
+  top: 48px;
   background-color: Chocolate;
 }
 
 .backtrackType-dispatch_net {
   top: 24px;
-  background-color: Peru;
+  background-color: CornflowerBlue;
 }
 
 .backtrackType-dispatch_gen {
-  top: 24px;
+  top: 12px;
   background-color: Peru;
 }
 

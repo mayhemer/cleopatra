@@ -53,6 +53,7 @@
     },
 
     handleEvent: function AppUI_handleEvent(evt) {
+      // alert("DEBUG 2");
       switch (evt.target.id) {
         case 'datafile':
           this.loadProfileFile(document.getElementById('datafile').files);

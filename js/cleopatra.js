@@ -104,7 +104,9 @@
             }
             break;
           case "importFromAddonFinish":
+            // **************
             // alert("DEBUG 1");
+            // **************
             this.importFromAddonFinish(o.rawProfile);
             break;
         }
