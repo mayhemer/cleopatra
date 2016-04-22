@@ -213,6 +213,10 @@ WorkerRequest.prototype = {
 
 var Parser = {
   parse: function Parser_parse(data, params) {
+    // ************
+    //alert("Parser.parse");
+    // ************
+    
     console.log("profile num chars: " + data.length);
     var request = new WorkerRequest(gParserWorker);
     request.sendInChunks("parseRawProfile", data, params, 3000000);

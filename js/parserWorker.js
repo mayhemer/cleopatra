@@ -315,6 +315,10 @@ function parseRawProfile(requestID, params, rawProfile) {
   if (rawProfile.profileJSON && !rawProfile.profileJSON.meta && rawProfile.meta) {
     rawProfile.profileJSON.meta = rawProfile.meta;
   }
+  
+  if (rawProfile.profileJSON && !rawProfile.profileJSON.backtrack && rawProfile.backtrack) {
+    rawProfile.profileJSON.backtrack = rawProfile.backtrack;
+  }
 
   if (typeof rawProfile == "object") {
     switch (rawProfile.format) {
@@ -2346,10 +2350,11 @@ function calculateBacktrackData(requestID, profileID, boundaries) {
   var profile = gProfiles[profileID];
   var backtrack = profile.backtrack;
   
-  var result = {
-    boundaries: boundaries,
-    threads: backtrack.threads,
-    reference: backtrack.sampler_reference
+  var result = { 
+    boundaries: boundaries 
+  };
+  for (var property in backtrack) {
+    result[property] = backtrack[property];
   };
   
   sendFinished(requestID, result);  

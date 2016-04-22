@@ -17,7 +17,7 @@ function createElement(name, props) {
   return el;
 }
 
-function Backtrack(data)
+function Backtrack()
 {
   this.container = createElement("div", {
     className: "histogram",
@@ -33,7 +33,13 @@ Backtrack.prototype = {
   round: function(ms) {
     return Math.round(ms * 10) / 10.0;
   },
-  
+
+  clock_time: function(ms) {
+    var tick_diff_us = (this.data.timing.tick - ms) * 1000;
+    var clock_us = this.data.timing.clock - tick_diff_us;
+    return (new Date(clock_us / 1000)).toLocaleString();
+  },
+
   getContainer: function Backtrack_getContainer() {
     return this.container;
   },
@@ -179,6 +185,8 @@ Backtrack.prototype = {
   },
 
   display: function Backtrack_display() {
+    console.log("backtrack.draw begin");
+
     this.container.innerHTML = "";
 
     var range = this.data.boundaries.max - this.data.boundaries.min;
@@ -189,7 +197,20 @@ Backtrack.prototype = {
     caret.marker = this.objectiveMarker;
     caret.closing = caret.marker;
     caret.closing_thread = caret.thread;
-    
+    caret.cpu_state = 1;
+    caret.backup = function () {
+      var copy = {};
+      for (p in this) {
+        copy[p] = this[p];
+      }
+      return copy;
+    }
+
+    function logstr_caret(caret)
+    {
+      return JSON.stringify(caret.marker) + "@" + JSON.stringify([caret.thread.name,caret.thread.tid]);
+    }
+
     var backdraw = function(caret, name)
     {
       var startX = (caret.marker.time - this.data.boundaries.min) * 100.0 / range;
@@ -203,20 +224,39 @@ Backtrack.prototype = {
         }
       });
 
-      var begin_time = this.round(caret.marker.time);
+      var begin_time = this.clock_time(caret.marker.time);
       var begin_thread = caret.thread.name;
       var duration = this.round(caret.closing.time - caret.marker.time);
       var end_thread = caret.closing_thread.name;
       var what = caret.marker.w;
       var details = caret.marker.d;
-      block.setAttribute("title", 
-        begin_time + "ms@" + begin_thread + "\n+" + 
-        duration + "ms@" + end_thread + "\n" + 
+      block.setAttribute("title",
+        begin_time + " @ " + begin_thread + "\n" +
+        duration + "ms @ " + end_thread + "\n" +
         (what || "") + (details ? " / " + details : "")) ;
       this.container.appendChild(block);
-      
+
+      console.log("backdraw: " + logstr_caret(caret) + " type=" + name);
+
       caret.closing = caret.marker;
       caret.closing_thread = caret.thread;
+    }.bind(this);
+
+    var draw_input = function(caret)
+    {
+      var startX = (caret.marker.time - this.data.boundaries.min) * 100.0 / range;
+
+      var block = createElement("div", {
+        className: "backtrackInput",
+        style: {
+          right: (100 - startX) + "%"
+        }
+      });
+
+      block.textContent = caret.marker.w + "\n" +
+                          caret.marker.d + "\n@" +
+                          this.clock_time(caret.marker.time);
+      this.container.appendChild(block);
     }.bind(this);
 
     var find = function(gid, caret)
@@ -225,34 +265,64 @@ Backtrack.prototype = {
         console.log("gid.id == 0");
         return false;
       }
-      
+
       caret.thread = this.data.threads[gid[0]];
       if (!caret.thread) {
         console.log("thread for gid.tid=" + gid[0] + " not found");
         return false;
       }
-      
+
       caret.marker = caret.thread.markers[gid[1] - 1];
       return (caret.marker.i == gid[1]);
     }.bind(this);
 
     while (caret.marker.time > this.data.boundaries.min) {
-
       switch (caret.marker.t) {
         case "d": // dequeue
           backdraw(caret, "CPU_on_path");
-          if (!find(caret.marker.o, caret) ) {
+
+          var revert = caret.backup();
+
+          if (!find(caret.marker.o, caret)) {
             console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
             return;
           }
+
+          var params = caret.marker.w && caret.marker.w.match(/\[(.*)\]$/);
+          if (params) {
+            if (params.includes("control")) {
+              // Ignore control dispatches
+              caret = revert;
+              break;
+            }
+          }
+
           backdraw(caret, "dispatch_" + caret.marker.w);
           break;
+        case "e": // end of execution
+          backdraw(caret, "CPU_on_path");
+          if (!find(caret.marker.o, caret) ) {
+            console.log("Execution span start not found " + JSON.stringify(caret));
+            return;
+          }
+          backdraw(caret, "CPU_blocking");
+          break;
+        case "i": // user input
+          backdraw(caret, "CPU_on_path");
+          draw_input(caret);
+          console.log("backtrack.draw finished on user input");
+          return;
       }
 
       if (!find([caret.thread.tid, caret.marker.i - 1], caret)) {
-        console.log("Hit start of the thread");
+        console.log("Hit start of the thread?");
         break;
       }
     } // while (in range)
+
+    // Probably needs some conditioning.. lazy to figure this out now
+    backdraw(caret, "CPU_on_path");
+
+    console.log("backtrack.draw done");
   }
 };

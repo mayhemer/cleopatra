@@ -808,6 +808,12 @@ iframe {
   background-color: DarkGray;
 }
 
+.backtrackType-dispatch_idle {
+  top: 0;
+  height: 100%;
+  background-color: Beige;
+}
+
 .backtrackType-dispatch_run {
   top: 0;
   background-color: DeepPink;
@@ -815,11 +821,6 @@ iframe {
 
 .backtrackType-dispatch_ipc {
   top: 0;
-  background-color: DarkBlue;
-}
-
-.backtrackType-dispatch_ipco {
-  top: 0px;
   background-color: Coral;
 }
 
@@ -838,7 +839,7 @@ iframe {
   background-color: Peru;
 }
 
-.backtrackType-network {
-  top: 32px;
-  background-color: CornflowerBlue;
+.backtrackInput {
+  position: absolute;
+  display: inline-block;
 }
