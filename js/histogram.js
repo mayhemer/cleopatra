@@ -109,7 +109,7 @@ var HistogramContainer;
       container.appendChild(br3);
       container.appendChild(text2);
       this.waterfallRow.appendChild(container);
-      
+
       var cell = createElement("div", {
         style: {flex: 1},
         className: "threadHistogramContent"
@@ -132,23 +132,25 @@ var HistogramContainer;
       text1 = createElement("text", {
         textContent: "Backtrack",
       });
-      var reachPickButton = createElement("input", {
+      var objectivePickButton = createElement("input", {
           type:"button",
           value:"Pick"
       });
       container.appendChild(text1);
       container.appendChild(createElement("br", {}));
-      container.appendChild(reachPickButton);
+      container.appendChild(objectivePickButton);
       this.backtrackRow.appendChild(container);
-      
+
       var cell = createElement("div", {
         style: {flex: 1},
         className: "threadHistogramContent"
       });
       this.backtrackRow.appendChild(cell);
       this.backtrack = new Backtrack();
-      this.backtrack.setPickButton(reachPickButton);
+      this.backtrack.setPickButton(objectivePickButton);
       cell.appendChild(this.backtrack.getContainer());
+
+      window.gBacktrack = this.backtrack;
 
       var compositorThreadMinimize = null;
       Object.keys(threads).forEach(function (id) {
@@ -258,11 +260,11 @@ var HistogramContainer;
         this.waterfallRow.style.display = "none";
       }
     },
-    
+
     assignBacktrackData: function(data) {
       if (this.backtrack && data) {
         this.backtrackRow.style.display = "";
-        this.backtrack.assignData(data);
+        this.backtrack.assignData(this, data);
       }
       if (!data && this.backtrackRow) {
         this.backtrackRow.style.display = "none";

@@ -315,7 +315,7 @@ function parseRawProfile(requestID, params, rawProfile) {
   if (rawProfile.profileJSON && !rawProfile.profileJSON.meta && rawProfile.meta) {
     rawProfile.profileJSON.meta = rawProfile.meta;
   }
-  
+
   if (rawProfile.profileJSON && !rawProfile.profileJSON.backtrack && rawProfile.backtrack) {
     rawProfile.profileJSON.backtrack = rawProfile.backtrack;
   }
@@ -768,6 +768,7 @@ function parseRawProfile(requestID, params, rawProfile) {
            name: profile.threads[tid].name || defaultThreadName,
            samples: threadSamples,
            markers: markers,
+           tid: profile.threads[tid].tid
          };
       }
     } else {
@@ -826,7 +827,7 @@ function parseRawProfile(requestID, params, rawProfile) {
         threads["timeline"+i] = fakeThread;
       }
     }
-    
+
     tasktracer = profile.tasktracer;
     backtrack = profile.backtrack;
 
@@ -938,6 +939,7 @@ function parseRawProfile(requestID, params, rawProfile) {
     var thread = threads[tid];
     threadsDesc[tid] = {
       name: thread.name,
+      tid: thread.tid
     };
   }
 
@@ -2043,8 +2045,8 @@ var diagnosticList = [
     image: "plugin.png",
     title: "Sync Plugin Constructor",
     check: function(frames, symbols, meta) {
-      return stepContains('CallPPluginInstanceConstructor', frames, symbols) 
-          || stepContains('CallPCrashReporterConstructor', frames, symbols) 
+      return stepContains('CallPPluginInstanceConstructor', frames, symbols)
+          || stepContains('CallPCrashReporterConstructor', frames, symbols)
           || stepContains('PPluginModuleParent::CallNP_Initialize', frames, symbols)
           || stepContains('GeckoChildProcessHost::SyncLaunch', frames, symbols)
           ;
@@ -2061,24 +2063,24 @@ var diagnosticList = [
     image: "io.png",
     title: "Main Thread IO!",
     check: function(frames, symbols, meta) {
-      return stepContains('__getdirentries64', frames, symbols) 
-          || stepContains('__open', frames, symbols) 
+      return stepContains('__getdirentries64', frames, symbols)
+          || stepContains('__open', frames, symbols)
 
           // Window IO Functions
-          || stepContains('NtClose', frames, symbols) 
-          || stepContains('NtFlushBuffersFile', frames, symbols) 
-          || stepContains('NtSetInformationFile', frames, symbols) 
-          || stepContains('NtWriteFile', frames, symbols) 
-          || stepContains('ZwCreateFile', frames, symbols) 
-          || stepContains('ZwQueryFullAttributesFile', frames, symbols) 
+          || stepContains('NtClose', frames, symbols)
+          || stepContains('NtFlushBuffersFile', frames, symbols)
+          || stepContains('NtSetInformationFile', frames, symbols)
+          || stepContains('NtWriteFile', frames, symbols)
+          || stepContains('ZwCreateFile', frames, symbols)
+          || stepContains('ZwQueryFullAttributesFile', frames, symbols)
 
-          || stepContains('storage:::Statement::ExecuteStep', frames, symbols) 
-          || stepContains('__unlink', frames, symbols) 
-          || stepContains('fsync', frames, symbols) 
+          || stepContains('storage:::Statement::ExecuteStep', frames, symbols)
+          || stepContains('__unlink', frames, symbols)
+          || stepContains('fsync', frames, symbols)
           || stepContains('stat$INODE64', frames, symbols)
-          || stepEquals('read', frames, symbols) 
-          || stepEquals('write', frames, symbols) 
-          || stepEquals('fsync', frames, symbols) 
+          || stepEquals('read', frames, symbols)
+          || stepEquals('write', frames, symbols)
+          || stepEquals('fsync', frames, symbols)
           ;
     },
   },
@@ -2349,15 +2351,15 @@ function getLogData(requestID, profileID, boundaries) {
 function calculateBacktrackData(requestID, profileID, boundaries) {
   var profile = gProfiles[profileID];
   var backtrack = profile.backtrack;
-  
-  var result = { 
-    boundaries: boundaries 
+
+  var result = {
+    boundaries: boundaries
   };
   for (var property in backtrack) {
     result[property] = backtrack[property];
   };
-  
-  sendFinished(requestID, result);  
+
+  sendFinished(requestID, result);
 }
 
 // Within each marker type the returned markers should be sorted in ascending order
@@ -2382,7 +2384,7 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
   var compThread = null;
   var compThreadMarkers = null;
   var compThreadId;
-  
+
   // List possible threads
   for (var threadId in profile.threads) {
     var thread = profile.threads[threadId];
@@ -2752,7 +2754,7 @@ function calculateWaterfallData(requestID, profileID, boundaries, selectedThread
       }
     }
   }
-  
+
   var mainThreadState = "Waiting";
   var compThreadState = "Waiting";
   var compThreadPos = 0;

@@ -214,6 +214,12 @@
         return gCallGraph.getContainer();
       });
 
+      if (gBacktrack) {
+        gTabWidget.addTab("Backtrack", function() {
+          return gBacktrack.getTabContainer();
+        });
+      }
+
       currRow = document.createElement("div");
       currRow.className = "tabPane";
       currRow.appendChild(gTabWidget.getContainer());

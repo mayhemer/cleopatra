@@ -505,7 +505,7 @@
         }
         self.loadRawProfile(subreporters.parsing, xhr.responseText, url);
       }
-      function onerror(e) { 
+      function onerror(e) {
         subreporters.fileLoading.begin("Error fetching profile :(. URL: '" + url + "'. Did you set the CORS headers?");
       }
 
@@ -528,7 +528,7 @@
       }
       var startTime = Date.now();
       var parseRequest = Parser.parse(rawProfile, {
-        appendVideoCapture : gAppendVideoCapture,  
+        appendVideoCapture : gAppendVideoCapture,
         profileId: profileId,
       });
       gVideoCapture = null;
@@ -542,7 +542,6 @@
         reporter.finish();
         gMeta = result.meta;
         gTaskTracer = result.tasktracer;
-        gBacktrack = result.backtrack;
         gNumSamples = result.numSamples;
         gSymbols = result.symbols;
         gFunctions = result.functions;

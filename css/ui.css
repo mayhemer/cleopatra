@@ -784,16 +784,32 @@ iframe {
 .backtrackTape:hover {
   opacity: 0.6;
 }
-.backtrackTape[tooltip]:before {            
+.backtrackTape[tooltip]:before {
   position : absolute;
   margin-left: 1em;
   content : attr(tooltip);
   display: none;
   width: 50em;
-  z-index: 99999;
+  z-index: 100;
 }
-.backtrackTape[tooltip]:hover:before {            
+.backtrackTape[tooltip]:hover:before {
   display: block;
+}
+
+.backtrackTape.control:hover {
+  opacity: 1;
+  z-index: 100;
+}
+.backtrackTape.control {
+  opacity: 0.35;
+  z-index: 99;
+  margin-top: 6px;
+}
+
+.backtrackTape.sub-track {
+  opacity: 0.5;
+  top: 50%;
+  max-height: 50% !important;
 }
 
 .backtrackType-CPU_on_path {
@@ -808,38 +824,89 @@ iframe {
   background-color: DarkGray;
 }
 
-.backtrackType-dispatch_idle {
-  top: 0;
-  height: 100%;
+.backtrackType-dispatch-idle {
+  top: 24px;
   background-color: Beige;
 }
 
-.backtrackType-dispatch_run {
+.backtrackType-dispatch-run {
   top: 0;
   background-color: DeepPink;
 }
 
-.backtrackType-dispatch_ipc {
+.backtrackType-dispatch-ipc {
   top: 0;
-  background-color: Coral;
+  background-color: Darkviolet;
 }
 
-.backtrackType-dispatch_timer {
+.backtrackType-dispatch-timer {
   top: 48px;
-  background-color: Chocolate;
+  background: repeating-linear-gradient(45deg, SteelBlue, SteelBlue 2px, LightSteelBlue 2px, LightSteelBlue 4px); 
 }
 
-.backtrackType-dispatch_net {
+.backtrackType-dispatch-net {
   top: 24px;
   background-color: CornflowerBlue;
 }
 
-.backtrackType-dispatch_gen {
+.backtrackType-dispatch-queue {
   top: 12px;
   background-color: Peru;
+}
+
+.backtrackType-dispatch-wake:before {
+  /* content: 'Wake'; */
+}
+.backtrackType-dispatch-notify,
+.backtrackType-dispatch-wake {
+  top: 12px;
+  background-color: Teal;
+}
+
+.backtrackType-dispatch-lock-wait {
+  top: 0;
+  background-color: Gold;
+}
+
+.backtrackType-dispatch-io {
+  top: 0;
+  height: 100%;
+  background-color: OliveDrab;
+}
+
+.backtrackType-dispatch-nesting {
+  top: 32px;
+  background-color: #EEE;
 }
 
 .backtrackInput {
   position: absolute;
   display: inline-block;
+}
+
+.backtrackNesting {
+  top: 0px;
+  color: coral;
+  z-index: 100;
+  margin-left: -2px;
+  text-shadow: none;
+}
+
+.backtrackTab {
+  padding: 1em;
+  background: white;
+  min-height: 100%;
+}
+
+div.backtrackTab > div.group {
+  padding: 1em;
+  border-bottom: 1px solid gray;
+}
+
+div.backtrackTab > div.group > div:first-child {
+  font-weight: bold;
+}
+
+div.backtrackTab a {
+  padding: 0 0.5em;
 }
