@@ -36,8 +36,11 @@ function Backtrack()
 
   this.objectiveMarker = null;
   this.objectiveThread = null;
+  this.originalObjectiveMarker = null;
+  this.originalObjectiveThread = null;
   this.follow_thread = false;
   this.down_to_limit = 0;
+  this.dont_follow = [];
   
   this.history = [];
 
@@ -120,7 +123,12 @@ Backtrack.prototype = {
         selectorContent.parentNode.removeChild(selectorContent);
         this.objectiveMarker = objectiveMarkers[typeSelector.value].marker;
         this.objectiveThread = objectiveMarkers[typeSelector.value].thread;
+        this.originalObjectiveMarker = this.objectiveMarker;
+        this.originalObjectiveThread = this.objectiveThread;
         this.history = [];
+        
+        this.record = null;
+        this.display(true /* prescan */);
         this.display();
       }
       selectorContent.appendChild(backButton);
@@ -201,12 +209,15 @@ Backtrack.prototype = {
     }
   },
   
-  subtrack: function Backtrack_subtrack(thread, marker, limit, follow_thread) {
-    this.history.push([this.objectiveThread, this.objectiveMarker, this.follow_thread, this.down_to_limit]);
+  subtrack: function Backtrack_subtrack(thread, marker, limit, follow_thread, dont_follow_thread_and_marker) {
+    this.history.push([this.objectiveThread, this.objectiveMarker, this.follow_thread, this.down_to_limit, this.dont_follow]);
     this.objectiveThread = thread;
     this.objectiveMarker = marker;
     this.follow_thread = follow_thread;
     this.down_to_limit = limit;
+    if (dont_follow_thread_and_marker) {
+      this.dont_follow = this.dont_follow.concat([dont_follow_thread_and_marker]);
+    }
     this.display();
   },
   
@@ -214,37 +225,14 @@ Backtrack.prototype = {
     if (!this.history.length) {
       alert("Nothing in history");
     }
-    [this.objectiveThread, this.objectiveMarker, this.follow_thread, this.down_to_limit] = this.history.pop();
+    [this.objectiveThread, this.objectiveMarker, this.follow_thread, this.down_to_limit, this.dont_follow] = this.history.pop();
     this.display();
   },
 
-  display: function Backtrack_display() {
-    console.log("backtrack.draw begin");
+  display: function Backtrack_display(prescan) {
+    prescan = prescan || false;
+    console.log("backtrack.draw begin, prescan=" + prescan);
     
-    this.container.innerHTML = "";
-    this.tabContainer.innerHTML = "";
-    this.tapePutBackzIndex = 100;
-
-    this.tabContainer.appendChild(createElement("div", { className: "group" }, (e) => {
-      if (this.history.length > 0) {
-        e.appendChild(createElement("button", {}, (e) => {
-          e.onclick = () => {
-            this.unsubtrack();
-          }
-          e.textContent = "< Back";
-        }));
-      }
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Objective: " + this.objectiveMarker.w;
-      }));
-      e.appendChild(createElement("div", {style: {color: "RoyalBlue"} }, (e) => {
-        e.textContent = this.objectiveMarker.d;
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = this.objectiveThread.name + ", " + this.clock_time(this.objectiveMarker.time);
-      }));
-    }));
-
     var stats = {
       capturing: false,
       CPU_on_path: 0,
@@ -265,6 +253,7 @@ Backtrack.prototype = {
         var t = {
           name: thread.name,
           utilization: 0,
+          blocking: 0,
           runwait: 0,
           sleep: 0,
           IO: 0,
@@ -393,12 +382,21 @@ Backtrack.prototype = {
         e.textContent = "Push back";
       }));
 
-      if (what.params.includes("control") || this.follow_thread) {
+      if (what.params.includes("control") || this.follow_thread || caret.closing.t == "e") {
         container.appendChild(createElement("button", {}, (e) => {
           e.onclick = () => {
-            this.subtrack(caret.closing_thread, caret.closing, false);
+            this.subtrack(caret.closing_thread, caret.closing, 0, false);
           }
           e.textContent = "Follow";
+        }));
+      }
+      
+      if (caret.closing.t == "d") {
+        container.appendChild(createElement("button", {}, (e) => {
+          e.onclick = () => {
+            this.subtrack(this.objectiveThread, this.objectiveMarker, 0, false, [caret.closing_thread, caret.closing]);
+          }
+          e.textContent = "Don't follow";
         }));
       }
       
@@ -462,10 +460,6 @@ Backtrack.prototype = {
           caret.stats.CPU_on_path += cduration;
           thread_stat(caret.thread, caret.stats).utilization += cduration;
           break;
-        case "CPU_blocking":
-          caret.stats.CPU_blocking += cduration;
-          thread_stat(caret.thread, caret.stats).utilization += cduration;
-          break;
         case "dispatch-lock-wait":
           caret.stats.lock_wait += cduration;
           thread_stat(caret.thread, caret.stats).lock_wait += cduration;
@@ -484,7 +478,7 @@ Backtrack.prototype = {
         case "dispatch-net":
           caret.stats.network += cduration;
           break;
-        case "dispatch-gen":
+        case "dispatch-queue":
           caret.stats.general_queues += cduration;
           break;
         case "dispatch-idle":
@@ -494,7 +488,7 @@ Backtrack.prototype = {
         }
       }
 
-      console.log("  backdraw_and_shift: " + logstr_caret(caret) + " type=" + name);
+      console.log("  backdraw_and_shift: " + logstr_caret(caret) + " type=" + name + " X=" + startX);
 
       caret.closing = caret.marker;
       caret.closing_thread = caret.thread;
@@ -518,172 +512,379 @@ Backtrack.prototype = {
       this.container.appendChild(block);
     }.bind(this);
 
-
-    var draw_nesting = function(caret)
-    {
-      var startX = (caret.marker.time - this.data.boundaries.min) * 100.0 / range;
-      var stopX = (caret.closing.time - this.data.boundaries.min) * 100.0 / range;
-
-      var block1 = createElement("div", {
-        className: "backtrackTape backtrackNesting",
-        style: {
-          left: startX + "%",
-        }
-      });
-      block1.textContent = "\u21BF";
-      block1.title = caret.marker.d;
-      this.container.appendChild(block1);
-
-      var block2 = createElement("div", {
-        className: "backtrackTape backtrackNesting",
-        style: {
-          left: stopX + "%",
-          top: "1em"
-        }
-      });
-      block2.textContent = "\u21C2";
-      this.container.appendChild(block2);
-    }.bind(this);
-
     var found_input = false;
-    var is_first_marker = true;
-    main: while (!found_input && (caret.marker.time >= this.data.boundaries.min) && 
-                                 (caret.marker.time >= this.down_to_limit)) {
-      console.log("Backtrack loop on: " + JSON.stringify(caret.marker));
-      switch (caret.marker.t) {
-        case "d": // dequeue
-          backdraw_and_shift(caret, "CPU_on_path");
-
-          var revert = caret.clone();
-
-          if (!move_cursor_to(caret.marker.o, caret)) {
-            console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
-            return;
+    
+    if (prescan) { // this really is a hack :)
+    
+      var nested_execs = [];
+      
+      var record = {
+        unmarked: 0,
+        critical: 1,
+        related: 2,
+        
+        add: function(marker, thread, level) {
+          var thread = thread.tid;
+          if (!(thread in this)) {
+            this[thread] = {};
           }
-
-          var what = parse_what(caret.marker.w);
-
-          // TODO - special case the network dequeue: go down to idle end and then jump
-
-          if (what.name == "nesting") {
-            // draw_nesting(caret);
+          thread = this[thread];
+          thread[marker.i] = level;
+        },
+        
+        level: function(marker, thread) {
+          var thread = thread.tid;
+          if (!(thread in this)) {
+            return this.unmarked;
           }
+          thread = this[thread];
+          return thread[marker.i] || this.unmarked;
+        }
+      };
+      
+      var complex_hits = [];
+      
+      // mark critical
+      scan: while (!found_input) {     
+        
+        record.add(caret.marker, caret.thread, record.critical);
+        
+        switch (caret.marker.t) {
+          case "d": // dequeue (execution start)
+            if (nested_execs.length && nested_execs[0].marker == caret.marker) {
+              nested_execs.shift();
+              break;
+            }
 
-          if (what.params.includes("control") || this.follow_thread) {
-            // Ignore control dispatches
-            // TODO: rework this to not split current CPU_on_path
-            backdraw_and_shift(caret, "dispatch-" + what.name, "control");
-            caret = revert;
+            var revert = caret.clone();
+
+            if (!move_cursor_to(caret.marker.o, caret)) {
+              console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
+              return;
+            }
+
+            var what = parse_what(caret.marker.w);
+            if (what.params.includes("control")) {
+              caret = revert;
+            } else {
+              record.add(caret.marker, caret.thread, record.critical); 
+            }
+
             break;
-          }
 
-          backdraw_and_shift(caret, "dispatch-" + what.name);
-          
-          break;
-
-        case "e": // end of execution
-          if (is_first_marker && !this.follow_thread) {
-            // is_first_marker - when tracking a particular runnable, we start from e, but want it as CPU-path
-            // and do this only when we are normally fully backtracking and not just following the thread (in
-            // case of showing blocking runnables, for instance) 
+          case "e": // end of execution
+            var exec_start = caret.clone();
+            if (!move_cursor_to(caret.marker.o, exec_start)) {
+              console.log("Execution span start not found " + JSON.stringify(caret.marker));
+              return;
+            }
+            nested_execs.unshift(exec_start);
             break;
-          }
-          
-          backdraw_and_shift(caret, "CPU_on_path");
-          if (!move_cursor_to(caret.marker.o, caret)) {
-            console.log("Execution span start not found " + JSON.stringify(caret.marker));
-            return;
-          }
-          backdraw_and_shift(caret, "CPU_blocking");
-          break;
+            
+          case "i": // input
+            found_input = true;
+            break scan;
+            
+          case "h": // hit complex point
+            complex_hits.push(caret.clone());
+            break;
+        }  
 
-        case "i": // user input
-          backdraw_and_shift(caret, "CPU_on_path");
-          draw_input(caret);
-          console.log("backtrack.draw finished on user input");
-          found_input = true;
-          break;
-      }
-
-      skip: do {
         if (!move_cursor_to([caret.thread.tid, caret.marker.i - 1], caret)) {
           console.log("Hit start of the thread?");
-          break main;
+          break;
         }
-      } while (!(["d","e","i"].includes(caret.marker.t)));
+      }
       
-      is_first_marker = false;
-    } // while (in range)
+      // mark related
+      while (complex_hits.length) {
+        caret = complex_hits.shift();
+        previous = caret.clone();
+        if (!move_cursor_to(caret.marker.o, previous)) {
+          console.log("Previous complex hit marker not found " + JSON.stringify(caret));
+          return;
+        }
+        if (previous.marker.t == "h" &&
+            complex_hits.find((cursor) => { 
+              return cursor.marker.i == previous.marker.i && cursor.thread.tid == previous.thread.tid 
+            }) == undefined) {
+          complex_hits.push(previous);
+        }
+        
+        found_input = false;
+        related_scan: while (!found_input) {
+          if (!move_cursor_to([caret.thread.tid, caret.marker.i - 1], caret)) {
+            console.log("Hit start of the thread?");
+            break;
+          }
+        
+          if (record.level(caret.marker, caret.thread) > record.unmarked) {
+            // We are back on the road...
+            break related_scan;
+          }
+          
+          record.add(caret.marker, caret.thread, record.related); 
+          
+          switch (caret.marker.t) {
+            case "d": // dequeue (execution start)
+              if (nested_execs.length && nested_execs[0].marker == caret.marker) {
+                nested_execs.shift();
+                break;
+              }
 
-    // Probably needs some conditioning.. lazy to figure this out now
-    if (!found_input) {
-      backdraw_and_shift(caret, "CPU_on_path");
-    }
+              var revert = caret.clone();
 
-    console.log("backtrack.draw done");
+              if (!move_cursor_to(caret.marker.o, caret)) {
+                console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
+                return;
+              }
 
-    var overall_time =
-      Math.min(this.objectiveMarker.time, this.data.boundaries.max) -
-      Math.max(caret.marker.time, this.data.boundaries.min);
+              var what = parse_what(caret.marker.w);
+              if (what.params.includes("control")) {
+                caret = revert;
+              } else {
+                record.add(caret.marker, caret.thread, record.related); 
+              }
 
-    var timing_stat_string = function(time)
-    {
-      return this.round(time) + "ms (" + this.round((time / overall_time) * 100) + "%)";
-    }.bind(this);
+              break;
 
-    this.tabContainer.appendChild(createElement("div", { className: "group" }, (e) => {
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Selected element data";
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        this.selectedIntervalContainer = e;
-        e.textContent = "Click into the Backtrack view to pick an interval tape";
-      }));
-    }));
+            case "e": // end of execution
+              var exec_start = caret.clone();
+              if (!move_cursor_to(caret.marker.o, exec_start)) {
+                console.log("Execution span start not found " + JSON.stringify(caret.marker));
+                return;
+              }
+              nested_execs.unshift(exec_start);
+              break;
+              
+            case "i": // input
+              found_input = true;
+              break related_scan;
+              
+            case "h": // hit complex point
+              complex_hits.push(caret.clone());
+              break;
+          }  
+        }
+      }
+      
+      this.record = record;
+      // end of prescan
 
+    } else {
+    
+      // DRAWING
+      var is_first_marker = true;
+      var on_idle_poll_jump = null;
+      
+      this.container.innerHTML = "";
+      this.tabContainer.innerHTML = "";
+      this.tapePutBackzIndex = 100;
 
-    this.tabContainer.appendChild(createElement("div", { className: "group" }, (e) => {
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Statistics";
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Overall time: " + this.round(overall_time) + "ms";
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "CPU utilization (on path): " + timing_stat_string(stats.CPU_on_path);
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "CPU utilization (related): " + timing_stat_string(stats.CPU_related);
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "CPU utilization (blocking): " + timing_stat_string(stats.CPU_blocking);
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Dispatch wait: " + timing_stat_string(stats.runnable_wait);
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Lock wait: " + timing_stat_string(stats.lock_wait);
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Sleep wait: " + timing_stat_string(stats.sleep);
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "I/O: " + timing_stat_string(stats.IO);
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "IPC on wire: " + timing_stat_string(stats.IPC);
-      }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Network: " + timing_stat_string(stats.network);
-        e.appendChild(createElement("a", { href: "#" }, (e) => {
-          e.textContent = "Details";
-          e.onclick = () => this.expandNetworkingDetails(stats);
+      this.tabContainer.appendChild(createElement("div", { className: "group" }, (e) => {
+        if (this.history.length > 0) {
+          e.appendChild(createElement("button", {}, (e) => {
+            e.onclick = () => {
+              this.unsubtrack();
+            }
+            e.textContent = "< Back";
+          }));
+        }
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Objective: " + this.originalObjectiveMarker.w;
+        }));
+        e.appendChild(createElement("div", {style: {color: "RoyalBlue"} }, (e) => {
+          e.textContent = this.originalObjectiveMarker.d;
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = this.originalObjectiveThread.name + ", " + this.clock_time(this.originalObjectiveMarker.time);
         }));
       }));
-      e.appendChild(createElement("div", {}, (e) => {
-        e.textContent = "Queuing: " + timing_stat_string(stats.general_queues);
+
+      main: while (!found_input && (caret.marker.time >= this.data.boundaries.min) && 
+                                  (caret.marker.time >= this.down_to_limit)) {
+        console.log("Backtrack loop on: " + JSON.stringify(caret.marker));
+        switch (caret.marker.t) {
+          case "d": // dequeue
+            backdraw_and_shift(caret, "CPU_on_path");
+
+            if (this.dont_follow.findIndex((dont_follow) => {
+                  return (caret.marker.i == dont_follow[1].i && 
+                          caret.thread.tid == dont_follow[0].tid);
+                }) > -1) {
+              console.log("    marker manually set to not be followed");
+              break;
+            }
+          
+            var revert = caret.clone();
+
+            if (!move_cursor_to(caret.marker.o, caret)) {
+              console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
+              return;
+            }
+
+            var what = parse_what(caret.marker.w);
+
+            // special case the network dequeue: go down to idle[poll] end and then jump
+            if (what.name == "net" && !on_idle_poll_jump) {
+              console.log("    remembering this marker to follow after idle[poll] hit: " + JSON.stringify(caret.marker));
+              on_idle_poll_jump = revert.clone();
+              caret = revert;
+              break;
+            }
+            
+            if (what.name == "idle" && what.params.includes("poll") && on_idle_poll_jump) {
+              caret = on_idle_poll_jump;
+              move_cursor_to(caret.marker.o, caret);
+              what = parse_what(caret.marker.w);
+              on_idle_poll_jump = null;
+              console.log("    hit idle[poll], returning to " + JSON.stringify(caret.marker));
+            }
+
+            if (on_idle_poll_jump) {
+              console.log("    don't follow, we scan for idle[poll]: " + JSON.stringify(caret.marker));
+              caret = revert;
+              break;
+            }
+            
+            if ((what.params.includes("control") && !is_first_marker) || this.follow_thread) {
+              // Ignore control dispatches
+              // TODO: rework this to not split current CPU_on_path
+              backdraw_and_shift(caret, "dispatch-" + what.name, "control");
+              caret = revert;
+              break;
+            }
+
+            backdraw_and_shift(caret, "dispatch-" + what.name);
+            
+            break;
+
+          case "e": // end of execution
+            if (is_first_marker && !this.follow_thread) {
+              // is_first_marker - when tracking a particular runnable, we start from e, but want it as CPU-path
+              // and do this only when we are normally fully backtracking and not just following the thread (in
+              // case of showing blocking runnables, for instance) 
+              break;
+            }
+            
+            backdraw_and_shift(caret, "CPU_on_path");
+
+            if (!move_cursor_to(caret.marker.o, caret)) {
+              console.log("Execution span start not found " + JSON.stringify(caret.marker));
+              return;
+            }
+            
+            if (this.follow_thread) {
+              var level = this.record.level(caret.marker, caret.thread);
+              switch (level) {
+                case this.record.unmarked: level = "CPU_blocking"; break;
+                case this.record.critical: level = "CPU_critical"; break;
+                case this.record.related: level = "CPU_related"; break;
+              }
+              backdraw_and_shift(caret, level);
+            } else {
+              backdraw_and_shift(caret, "CPU_on_path_nested");
+            }
+            
+
+            break;
+
+          case "i": // user input
+            if (this.follow_thread) {
+              // Don't show (or at least definitely don't stop on) input when following thread
+              break;
+            }
+            backdraw_and_shift(caret, "CPU_on_path");
+            draw_input(caret);
+            console.log("backtrack.draw finished on user input");
+            found_input = true;
+            break;
+            
+          case "h": // hit a complex path
+            
+            break;
+        }
+
+        do {
+          if (!move_cursor_to([caret.thread.tid, caret.marker.i - 1], caret)) {
+            console.log("Hit start of the thread?");
+            break main;
+          }
+        } while (!(["d","e","i"].includes(caret.marker.t)));
+        
+        is_first_marker = false;
+      } // while (in range)
+
+      // Probably needs some conditioning.. lazy to figure this out now
+      if (!found_input) {
+        backdraw_and_shift(caret, "CPU_on_path");
+      }
+
+      console.log("backtrack.draw done");
+
+      var overall_time =
+        Math.min(this.objectiveMarker.time, this.data.boundaries.max) -
+        Math.max(caret.marker.time, this.data.boundaries.min);
+
+      var timing_stat_string = function(time)
+      {
+        return this.round(time) + "ms (" + this.round((time / overall_time) * 100) + "%)";
+      }.bind(this);
+
+      this.tabContainer.appendChild(createElement("div", { className: "group" }, (e) => {
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Selected element data";
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          this.selectedIntervalContainer = e;
+          e.textContent = "Click into the Backtrack view to pick an interval tape";
+        }));
       }));
-    }));
+
+
+      this.tabContainer.appendChild(createElement("div", { className: "group" }, (e) => {
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Statistics";
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Overall time: " + this.round(overall_time) + "ms";
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "CPU utilization (on path): " + timing_stat_string(stats.CPU_on_path);
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "CPU utilization (related): " + timing_stat_string(stats.CPU_related);
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "CPU utilization (blocking): " + timing_stat_string(stats.CPU_blocking);
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Dispatch wait: " + timing_stat_string(stats.runnable_wait);
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Lock wait: " + timing_stat_string(stats.lock_wait);
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Sleep wait: " + timing_stat_string(stats.sleep);
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "I/O: " + timing_stat_string(stats.IO);
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "IPC on wire: " + timing_stat_string(stats.IPC);
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Network: " + timing_stat_string(stats.network);
+          e.appendChild(createElement("a", { href: "#" }, (e) => {
+            e.textContent = "Details";
+            e.onclick = () => this.expandNetworkingDetails(stats);
+          }));
+        }));
+        e.appendChild(createElement("div", {}, (e) => {
+          e.textContent = "Queuing: " + timing_stat_string(stats.general_queues);
+        }));
+      }));
+    } // drawing
   },
 
   getTabContainer: function Backtrack_getTabContainer() {
