@@ -1,6 +1,14 @@
 // Test profile: e74815d8695ccf8580d4af3be5cd1371f202f6ae
 // 1305aa31f417005934020cd7181d8331691945d1
 
+var log_level = 2;
+
+function _btlog(level, msg)
+{
+  if (log_level < level) return;
+  console.log(msg);
+}
+
 function createElement(name, props, fill) {
   var el = document.createElement(name);
 
@@ -231,7 +239,7 @@ Backtrack.prototype = {
 
   display: function Backtrack_display(prescan) {
     prescan = prescan || false;
-    console.log("backtrack.draw begin, prescan=" + prescan);
+    _btlog(3, "backtrack.draw begin, prescan=" + prescan);
     
     var stats = {
       capturing: false,
@@ -303,13 +311,13 @@ Backtrack.prototype = {
     var move_cursor_to = function(gid, caret)
     {
       if (gid[1] == 0) {
-        console.log("gid.id == 0");
+        _btlog(3, "gid.id == 0");
         return false;
       }
 
       caret.thread = this.data.threads[gid[0]];
       if (!caret.thread) {
-        console.log("thread for gid.tid=" + gid[0] + " not found");
+        _btlog(3, "thread for gid.tid=" + gid[0] + " not found");
         return false;
       }
 
@@ -375,12 +383,14 @@ Backtrack.prototype = {
 
       container.appendChild(createElement("br", {}));
 
-      container.appendChild(createElement("button", {}, (e) => {
-        e.onclick = () => {
-          block.style.zIndex = (--this.tapePutBackzIndex) + "";
-        }
-        e.textContent = "Push back";
-      }));
+      if (what.params.includes("control")) {
+        container.appendChild(createElement("button", {}, (e) => {
+          e.onclick = () => {
+            block.style.zIndex = (--this.tapePutBackzIndex) + "";
+          }
+          e.textContent = "Push back";
+        }));
+      }
 
       if (what.params.includes("control") || this.follow_thread || caret.closing.t == "e") {
         container.appendChild(createElement("button", {}, (e) => {
@@ -411,6 +421,45 @@ Backtrack.prototype = {
         }));
       }
     }.bind(this);
+    
+    var draw_hit = function(caret)
+    {
+      var startX = (caret.marker.time - this.data.boundaries.min) * 100.0 / range;
+
+      var block = createElement("div", {
+        className: "backtrackTape backtrackType-hit",
+        style: {
+          left: startX + "%"
+        }
+      });
+      
+      this.container.appendChild(block);
+    }.bind(this);
+
+    var draw_joint = function(caret, level, prevlevel)
+    {
+      var startX = (caret.marker.time - this.data.boundaries.min) * 100.0 / range;
+      
+      var classtype;
+      if (level == this.record.critical) {
+        if (prevlevel == this.record.related) {
+          classtype = "rel-to-crit";
+        } else {
+          classtype = "crit";
+        }
+      } else {
+        classtype = "related";
+      }
+
+      var block = createElement("div", {
+        className: "backtrackTape backtrackType-rejoint-" + classtype,
+        style: {
+          left: startX + "%"
+        }
+      });
+      
+      this.container.appendChild(block);
+    }.bind(this);
 
     var backdraw_and_shift = function(caret, name, add_class_names)
     {
@@ -437,9 +486,15 @@ Backtrack.prototype = {
       var end_thread = caret.closing_thread.name;
       var what = caret.marker.w;
       var details = caret.marker.d;
+      var source = "";
+      switch (caret.marker.t) {
+        case "q": source = "Pending"; break;
+        case "d": source = "Execute"; break;
+      }
       block.setAttribute("title",
         begin_time + " @ " + begin_thread + "\n+" +
         duration + "ms @ " + end_thread + "\n\n" +
+        source + " " +  
         (what || "") + (details ? " - " + details : "")) ;
 
       var caret_clone = caret.clone();
@@ -488,7 +543,7 @@ Backtrack.prototype = {
         }
       }
 
-      console.log("  backdraw_and_shift: " + logstr_caret(caret) + " type=" + name + " X=" + startX);
+      _btlog(3, "  backdraw_and_shift: " + logstr_caret(caret) + " type=" + name + " X=" + startX);
 
       caret.closing = caret.marker;
       caret.closing_thread = caret.thread;
@@ -520,8 +575,8 @@ Backtrack.prototype = {
       
       var record = {
         unmarked: 0,
-        critical: 1,
-        related: 2,
+        related: 1,
+        critical: 2,
         
         add: function(marker, thread, level) {
           var thread = thread.tid;
@@ -547,26 +602,30 @@ Backtrack.prototype = {
       // mark critical
       scan: while (!found_input) {     
         
+        _btlog(2, "Prescan loop on: " + JSON.stringify(caret.marker));
+        
         record.add(caret.marker, caret.thread, record.critical);
         
         switch (caret.marker.t) {
           case "d": // dequeue (execution start)
             if (nested_execs.length && nested_execs[0].marker == caret.marker) {
               nested_execs.shift();
+              _btlog(3, "  poped nested dequeue");
               break;
             }
 
             var revert = caret.clone();
 
             if (!move_cursor_to(caret.marker.o, caret)) {
-              console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
+              _btlog(1, "Queue/dispatch marker not found " + JSON.stringify(caret));
               return;
             }
 
             var what = parse_what(caret.marker.w);
-            if (what.params.includes("control")) {
+            if (what.params.includes("control") || nested_execs.length) {
               caret = revert;
             } else {
+              _btlog(3, "  following");
               record.add(caret.marker, caret.thread, record.critical); 
             }
 
@@ -575,23 +634,26 @@ Backtrack.prototype = {
           case "e": // end of execution
             var exec_start = caret.clone();
             if (!move_cursor_to(caret.marker.o, exec_start)) {
-              console.log("Execution span start not found " + JSON.stringify(caret.marker));
+              _btlog(1, "Execution span start not found " + JSON.stringify(caret.marker));
               return;
             }
+            _btlog(3, "  pushed nested done");
             nested_execs.unshift(exec_start);
             break;
             
           case "i": // input
             found_input = true;
+            _btlog(3, "  found input");
             break scan;
             
-          case "h": // hit complex point
+          case "r": // subtasks resolution
+            _btlog(3, "Subtasks resulution hit " + JSON.stringify(caret.marker));
             complex_hits.push(caret.clone());
             break;
         }  
 
         if (!move_cursor_to([caret.thread.tid, caret.marker.i - 1], caret)) {
-          console.log("Hit start of the thread?");
+          _btlog(1, "Hit start of the thread?");
           break;
         }
       }
@@ -599,26 +661,38 @@ Backtrack.prototype = {
       // mark related
       while (complex_hits.length) {
         caret = complex_hits.shift();
+
+        _btlog(3, "Complex hit scan: " + JSON.stringify(caret.marker));
+
+        // Find the previous subtask completion
         previous = caret.clone();
-        if (!move_cursor_to(caret.marker.o, previous)) {
-          console.log("Previous complex hit marker not found " + JSON.stringify(caret));
-          return;
+        if (move_cursor_to(previous.marker.o, previous)) {
+          if (complex_hits.find((cursor) => { 
+                return cursor.marker.i == previous.marker.i && cursor.thread.tid == previous.thread.tid 
+              }) == undefined) 
+          {
+            complex_hits.push(previous);
+          }
         }
-        if (previous.marker.t == "h" &&
-            complex_hits.find((cursor) => { 
-              return cursor.marker.i == previous.marker.i && cursor.thread.tid == previous.thread.tid 
-            }) == undefined) {
-          complex_hits.push(previous);
+
+        if (caret.marker.t == "r") {
+          // This one is already tracked over, we can start from the last subtask
+          // in the chain.
+          continue;
         }
-        
+
         found_input = false;
         related_scan: while (!found_input) {
+
+          _btlog(2, "Related pre-scan: " + JSON.stringify(caret.marker));
+  
           if (!move_cursor_to([caret.thread.tid, caret.marker.i - 1], caret)) {
-            console.log("Hit start of the thread?");
+            _btlog(1, "Hit start of the thread? " + JSON.stringify(caret));
             break;
           }
         
           if (record.level(caret.marker, caret.thread) > record.unmarked) {
+            _btlog(3, "  back on the road");
             // We are back on the road...
             break related_scan;
           }
@@ -629,20 +703,22 @@ Backtrack.prototype = {
             case "d": // dequeue (execution start)
               if (nested_execs.length && nested_execs[0].marker == caret.marker) {
                 nested_execs.shift();
+                _btlog(3, "  nested poped");
                 break;
               }
 
               var revert = caret.clone();
 
               if (!move_cursor_to(caret.marker.o, caret)) {
-                console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
+                _btlog(1, "Queue/dispatch marker not found " + JSON.stringify(caret));
                 return;
               }
 
               var what = parse_what(caret.marker.w);
-              if (what.params.includes("control")) {
+              if (what.params.includes("control") || nested_execs.length) {
                 caret = revert;
               } else {
+                _btlog(3, "  following");
                 record.add(caret.marker, caret.thread, record.related); 
               }
 
@@ -651,9 +727,10 @@ Backtrack.prototype = {
             case "e": // end of execution
               var exec_start = caret.clone();
               if (!move_cursor_to(caret.marker.o, exec_start)) {
-                console.log("Execution span start not found " + JSON.stringify(caret.marker));
+                _btlog(1, "Execution span start not found " + JSON.stringify(caret.marker));
                 return;
               }
+              _btlog(3, "  nested pushed");
               nested_execs.unshift(exec_start);
               break;
               
@@ -661,7 +738,8 @@ Backtrack.prototype = {
               found_input = true;
               break related_scan;
               
-            case "h": // hit complex point
+            case "r": // subtasks resolution hit
+              _btlog(3, "  another subtask resolution hit");
               complex_hits.push(caret.clone());
               break;
           }  
@@ -676,6 +754,7 @@ Backtrack.prototype = {
       // DRAWING
       var is_first_marker = true;
       var on_idle_poll_jump = null;
+      var current_path_state = this.record.unmarked;
       
       this.container.innerHTML = "";
       this.tabContainer.innerHTML = "";
@@ -703,7 +782,14 @@ Backtrack.prototype = {
 
       main: while (!found_input && (caret.marker.time >= this.data.boundaries.min) && 
                                   (caret.marker.time >= this.down_to_limit)) {
-        console.log("Backtrack loop on: " + JSON.stringify(caret.marker));
+        _btlog(2, "Backtrack loop on: " + JSON.stringify(caret.marker));
+        
+        var marker_path_state = this.record.level(caret.marker, caret.thread);
+        if (current_path_state < marker_path_state) {
+          current_path_state = marker_path_state;
+          draw_joint(caret, current_path_state); 
+        }
+        
         switch (caret.marker.t) {
           case "d": // dequeue
             backdraw_and_shift(caret, "CPU_on_path");
@@ -712,22 +798,22 @@ Backtrack.prototype = {
                   return (caret.marker.i == dont_follow[1].i && 
                           caret.thread.tid == dont_follow[0].tid);
                 }) > -1) {
-              console.log("    marker manually set to not be followed");
+              _btlog(3, "    marker manually set to not be followed");
               break;
             }
           
             var revert = caret.clone();
 
             if (!move_cursor_to(caret.marker.o, caret)) {
-              console.log("Queue/dispatch marker not found " + JSON.stringify(caret));
+              _btlog(1, "Queue/dispatch marker not found " + JSON.stringify(caret));
               return;
             }
 
             var what = parse_what(caret.marker.w);
 
             // special case the network dequeue: go down to idle[poll] end and then jump
-            if (what.name == "net" && !on_idle_poll_jump) {
-              console.log("    remembering this marker to follow after idle[poll] hit: " + JSON.stringify(caret.marker));
+            if (what.name == "net" && !on_idle_poll_jump && !what.params.includes("nopoll")) {
+              _btlog(3, "    remembering this marker to follow after idle[poll] hit: " + JSON.stringify(caret.marker));
               on_idle_poll_jump = revert.clone();
               caret = revert;
               break;
@@ -738,11 +824,11 @@ Backtrack.prototype = {
               move_cursor_to(caret.marker.o, caret);
               what = parse_what(caret.marker.w);
               on_idle_poll_jump = null;
-              console.log("    hit idle[poll], returning to " + JSON.stringify(caret.marker));
+              _btlog(3, "    hit idle[poll], returning to " + JSON.stringify(caret.marker));
             }
 
             if (on_idle_poll_jump) {
-              console.log("    don't follow, we scan for idle[poll]: " + JSON.stringify(caret.marker));
+              _btlog(3, "    don't follow, we scan for idle[poll]: " + JSON.stringify(caret.marker));
               caret = revert;
               break;
             }
@@ -770,7 +856,7 @@ Backtrack.prototype = {
             backdraw_and_shift(caret, "CPU_on_path");
 
             if (!move_cursor_to(caret.marker.o, caret)) {
-              console.log("Execution span start not found " + JSON.stringify(caret.marker));
+              _btlog(1, "Execution span start not found " + JSON.stringify(caret.marker));
               return;
             }
             
@@ -796,21 +882,21 @@ Backtrack.prototype = {
             }
             backdraw_and_shift(caret, "CPU_on_path");
             draw_input(caret);
-            console.log("backtrack.draw finished on user input");
+            _btlog(2, "backtrack.draw finished on user input");
             found_input = true;
             break;
             
-          case "h": // hit a complex path
-            
+          case "s": // hit a sub-task chain completion
+            draw_hit(caret);
             break;
         }
 
         do {
           if (!move_cursor_to([caret.thread.tid, caret.marker.i - 1], caret)) {
-            console.log("Hit start of the thread?");
+            _btlog(1, "Hit start of the thread?");
             break main;
           }
-        } while (!(["d","e","i"].includes(caret.marker.t)));
+        } while (!(["d","e","i","s"].includes(caret.marker.t)));
         
         is_first_marker = false;
       } // while (in range)
@@ -820,7 +906,7 @@ Backtrack.prototype = {
         backdraw_and_shift(caret, "CPU_on_path");
       }
 
-      console.log("backtrack.draw done");
+      _btlog(2, "backtrack.draw done");
 
       var overall_time =
         Math.min(this.objectiveMarker.time, this.data.boundaries.max) -

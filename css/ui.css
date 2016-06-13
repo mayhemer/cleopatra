@@ -892,9 +892,42 @@ iframe {
   background-color: OliveDrab;
 }
 
-.backtrackType-dispatch-nesting {
-  top: 32px;
-  background-color: #EEE;
+.backtrackType-hit:before {
+  content: '\21B4';
+}
+.backtrackType-hit {
+  top: 0;
+  color: yellow;  
+  margin-left: -0.75em;
+  z-index: 2000;
+  text-shadow: none;
+}
+
+.backtrackType-rejoint-crit:before {
+  content: '\2199';
+}
+.backtrackType-rejoint-crit {
+  top: 0;
+  color: hotpink;  
+  z-index: 2000;
+}
+
+.backtrackType-rejoint-rel-to-crit:before {
+  content: '\2199';
+}
+.backtrackType-rejoint-rel-to-crit {
+  top: 0;
+  color: lightgreen;  
+  z-index: 2000;
+}
+
+.backtrackType-rejoint-related:before {
+  content: '\2199';
+}
+.backtrackType-rejoint-related {
+  top: 0;
+  color: lightskyblue;  
+  z-index: 2000;
 }
 
 .backtrackInput {
